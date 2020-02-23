@@ -31,11 +31,18 @@ Here we can create a column of line numbers. I manually went through the diary t
 diary$line_num <- seq.int(nrow(diary))
 
 year_one <-diary %>%
-  filter(line_num >= 1358, line_num < 4513)
+  filter(line_num >= 1358, line_num < 4513)%>%
+  mutate(year = "one")
 year_two <- diary %>%
-  filter(line_num >= 4513, line_num < 9201)
+  filter(line_num >= 4513, line_num < 9201)%>%
+  mutate(year = "two")
 year_three <- diary %>%
-  filter(line_num >= 9201, line_num <= 13660)
+  filter(line_num >= 9201, line_num <= 13660)%>%
+  mutate(year = "three")
+
+total<-rbind(year_one, year_two, year_three)
+
+
 
 ```
 
@@ -44,11 +51,12 @@ The next bit is a little more complicated. We write a regular expression (regex)
 ```{r}
 date_regex <- "^_(January|February|March|April|May|June|July|August|September|October|November|December) [0-9]*"
 
-by_entry <- diary %>%
+by_entry <- total %>%
   mutate(entry = cumsum(str_detect(text, date_regex))) %>%
   ungroup() %>%
   filter(entry > 0) %>%
-  mutate(const = 1)
+  mutate(const = 1)%>%
+  unite(document,year, entry)
 ```
 
 Now we split up each word.
@@ -63,7 +71,7 @@ The next step is to find word counts for the whole year. I do this by ungrouping
 # find document-word counts
 word_counts <- by_entry_word %>%
   anti_join(stop_words) %>%
-  count(const, word, sort = TRUE) %>%
+  count(document, word, sort = TRUE) %>%
   ungroup()%>%filter(word!=0 &word!=1&word!=2&word!=3&word!=4&word!=5&word!=6&word!=7&word!=8&word!=9)
 ```
 
@@ -71,13 +79,15 @@ word_counts <- by_entry_word %>%
 Here I do the LDA analysis. I decided to split up the diary into 5 topics. 
 ```{r}
 dtm <- word_counts %>%
-  cast_dtm(const, word, n)
+  cast_dtm(document, word, n)
 
 
-chapters_lda <- LDA(dtm, k = 2, control = list(seed = 14))
+chapters_lda <- LDA(dtm, k = 4, control = list(seed = 14))
 
 
 chapter_topics <- tidy(chapters_lda, matrix = "beta")
+
+
 ```
 
 
@@ -101,10 +111,18 @@ top_terms %>%
 
 
 ```{r}
-beta_spread <- chapter_topics %>%
-  mutate(topic = paste0("topic", topic)) %>%
-  spread(topic, beta) %>%
-  filter(topic1 > .001 | topic2 > .001) %>%
-  mutate(log_ratio = log2(topic2 / topic1))
+
+chapters_gamma <- tidy(chapters_lda, matrix = "gamma")
+chapters_gamma
+
+chapters_gamma <- chapters_gamma %>%
+  separate(document, c("year", "entry"), sep = "_", convert = TRUE)
+chapters_gamma
+
+chapters_gamma %>%
+  mutate(title = reorder(year, gamma * topic)) %>%
+  ggplot(aes(factor(topic), gamma)) +
+  geom_boxplot() +
+  facet_wrap(~ title)
 ```
 
