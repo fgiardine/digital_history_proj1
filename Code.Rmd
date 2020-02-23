@@ -1,0 +1,110 @@
+---
+title: "Digital History Project"
+author: "frg"
+date: "2/22/2020"
+output: html_document
+---
+# Getting Started
+First you need to install/update all of the packages. For the 'tidytext' package I highly recommend navigating to the history tab on the right of RStudio, and clearing the history. Install the package each time and then call it using the library function. Doing this prevents some strange errors that are implicit with the package.
+```{r setup, include=TRUE}
+
+library(gutenbergr)
+library(dplyr)
+install.packages("tidytext", repos = "http://cran.us.r-project.org")
+library(tidytext)
+library(topicmodels)
+library(stringr)
+library(tidyr)
+library(ggplot2)
+```
+
+We're going to be analyzing the diary of Richard Cocks. Richard Cocks (1566–1624) was the head of the British East India Company trading post in Hirado, Japan, between 1613 and 1623, from its creation, and lasting to its closure due to bankruptcy (https://en.wikipedia.org/wiki/Richard_Cocks). We can find his works using the "gutenberg_works" function. We can then use the gutenberg_download function to download the specific id. This gives us a data table of the entire text.
+
+```{r}
+works<-gutenberg_works(str_detect(author, "Cocks"))
+diary<- gutenberg_download(46803)
+
+```
+
+Here we can create a column of line numbers. I manually went through the diary to see when there was a change in year. This volume contains 1615, 1616, and 1617.
+```{r}
+diary$line_num <- seq.int(nrow(diary))
+
+year_one <-diary %>%
+  filter(line_num >= 1358, line_num < 4513)
+year_two <- diary %>%
+  filter(line_num >= 4513, line_num < 9201)
+year_three <- diary %>%
+  filter(line_num >= 9201, line_num <= 13660)
+
+```
+
+The next bit is a little more complicated. We write a regular expression (regex) to find all of the individual entries within the diary. Because each day has a unique date, we have to write something kind of nasty to make this work. I had to get help with this one as I am still learning how to use a regex. We then make a new data table where we have written the entry number for the first year into a column.
+
+```{r}
+date_regex <- "^_(January|February|March|April|May|June|July|August|September|October|November|December) [0-9]*"
+
+by_entry <- diary %>%
+  mutate(entry = cumsum(str_detect(text, date_regex))) %>%
+  ungroup() %>%
+  filter(entry > 0) %>%
+  mutate(const = 1)
+```
+
+Now we split up each word.
+```{r}
+by_entry_word <- by_entry %>%
+  unnest_tokens(word, text)
+```
+
+The next step is to find word counts for the whole year. I do this by ungrouping the contents of the rows so that we separate long strings of text. I clean this up further by removing all numbers that appear as unique works. I don't care to included these in the LDA analysis.
+
+```{r}
+# find document-word counts
+word_counts <- by_entry_word %>%
+  anti_join(stop_words) %>%
+  count(const, word, sort = TRUE) %>%
+  ungroup()%>%filter(word!=0 &word!=1&word!=2&word!=3&word!=4&word!=5&word!=6&word!=7&word!=8&word!=9)
+```
+
+
+Here I do the LDA analysis. I decided to split up the diary into 5 topics. 
+```{r}
+dtm <- word_counts %>%
+  cast_dtm(const, word, n)
+
+
+chapters_lda <- LDA(dtm, k = 2, control = list(seed = 14))
+
+
+chapter_topics <- tidy(chapters_lda, matrix = "beta")
+```
+
+
+
+
+```{r}
+top_terms <- chapter_topics %>%
+  group_by(topic) %>%
+  top_n(10, beta) %>%
+  ungroup() %>%
+  arrange(topic, -beta)
+
+top_terms %>%
+  mutate(term = reorder_within(term, beta, topic)) %>%
+  ggplot(aes(term, beta, fill = factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~ topic, scales = "free") +
+  coord_flip() +
+  scale_x_reordered()
+```
+
+
+```{r}
+beta_spread <- chapter_topics %>%
+  mutate(topic = paste0("topic", topic)) %>%
+  spread(topic, beta) %>%
+  filter(topic1 > .001 | topic2 > .001) %>%
+  mutate(log_ratio = log2(topic2 / topic1))
+```
+
