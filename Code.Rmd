@@ -32,13 +32,13 @@ diary$line_num <- seq.int(nrow(diary))
 
 year_one <-diary %>%
   filter(line_num >= 1358, line_num < 4513)%>%
-  mutate(year = "one")
+  mutate(year = "1615")
 year_two <- diary %>%
   filter(line_num >= 4513, line_num < 9201)%>%
-  mutate(year = "two")
+  mutate(year = "1616")
 year_three <- diary %>%
   filter(line_num >= 9201, line_num <= 13660)%>%
-  mutate(year = "three")
+  mutate(year = "1617")
 
 total<-rbind(year_one, year_two, year_three)
 
@@ -125,4 +125,24 @@ chapters_gamma %>%
   geom_boxplot() +
   facet_wrap(~ title)
 ```
+
+
+
+```{r}
+#by_entry %>%
+ # split(.$document) 
+
+
+customFun  = function(DF) {
+write.csv(DF$text,paste0("data/",unique(DF$document),".txt"),col.names = F, row.names = F)
+return(DF)}
+
+by_entry %>% 
+group_by(document) %>% 
+do(customFun(.))
+
+
+```
+
+
 
