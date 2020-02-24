@@ -51,12 +51,34 @@ The next bit is a little more complicated. We write a regular expression (regex)
 ```{r}
 date_regex <- "^_(January|February|March|April|May|June|July|August|September|October|November|December) [0-9]*"
 
-by_entry <- total %>%
-  mutate(entry = cumsum(str_detect(text, date_regex))) %>%
+
+year_one <-diary %>%
+  filter(line_num >= 1358, line_num < 4513)%>%
+  mutate(year = "1615")%>%
+  mutate(entry = cumsum(str_detect(text, date_regex)))   %>%
   ungroup() %>%
   filter(entry > 0) %>%
   mutate(const = 1)%>%
   unite(document,year, entry)
+year_two <- diary %>%
+  filter(line_num >= 4513, line_num < 9201)%>%
+  mutate(year = "1616")%>%
+  mutate(entry = cumsum(str_detect(text, date_regex)))%>%
+  ungroup() %>%
+  filter(entry > 0) %>%
+  mutate(const = 1)%>%
+  unite(document,year, entry)
+year_three <- diary %>%
+  filter(line_num >= 9201, line_num <= 13660)%>%
+  mutate(year = "1617")%>%
+  mutate(entry = cumsum(str_detect(text, date_regex)))%>%
+  ungroup() %>%
+  filter(entry > 0) %>%
+  mutate(const = 1)%>%
+  unite(document,year, entry)
+
+by_entry<-rbind(year_one, year_two, year_three)
+
 ```
 
 Now we split up each word.
