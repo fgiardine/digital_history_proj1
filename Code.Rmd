@@ -27,30 +27,13 @@ diary<- gutenberg_download(46803)
 ```
 
 Here we can create a column of line numbers. I manually went through the diary to see when there was a change in year. This volume contains 1615, 1616, and 1617.
-```{r}
-diary$line_num <- seq.int(nrow(diary))
-
-year_one <-diary %>%
-  filter(line_num >= 1358, line_num < 4513)%>%
-  mutate(year = "1615")
-year_two <- diary %>%
-  filter(line_num >= 4513, line_num < 9201)%>%
-  mutate(year = "1616")
-year_three <- diary %>%
-  filter(line_num >= 9201, line_num <= 13660)%>%
-  mutate(year = "1617")
-
-total<-rbind(year_one, year_two, year_three)
-
-
-
-```
 
 The next bit is a little more complicated. We write a regular expression (regex) to find all of the individual entries within the diary. Because each day has a unique date, we have to write something kind of nasty to make this work. I had to get help with this one as I am still learning how to use a regex. We then make a new data table where we have written the entry number for the first year into a column.
 
 ```{r}
 date_regex <- "^_(January|February|March|April|May|June|July|August|September|October|November|December) [0-9]*"
 
+diary$line_num <- seq.int(nrow(diary))
 
 year_one <-diary %>%
   filter(line_num >= 1358, line_num < 4513)%>%
@@ -133,7 +116,6 @@ top_terms %>%
 
 
 ```{r}
-
 chapters_gamma <- tidy(chapters_lda, matrix = "gamma")
 chapters_gamma
 
@@ -151,10 +133,6 @@ chapters_gamma %>%
 
 
 ```{r}
-#by_entry %>%
- # split(.$document) 
-
-
 customFun  = function(DF) {
 write.csv(DF$text,paste0("data/",unique(DF$document),".txt"),col.names = F, row.names = F)
 return(DF)}
@@ -162,9 +140,26 @@ return(DF)}
 by_entry %>% 
 group_by(document) %>% 
 do(customFun(.))
-
-
 ```
+
+
+Mallet Excel file
+```{r}
+library(readr)
+mallet <- read_csv("mallet.csv")
+View(mallet)
+
+mallet %>%
+  mutate(title = reorder(year, gamma * topic)) %>%
+  ggplot(aes(factor(topic), gamma)) +
+  geom_boxplot() +
+  facet_wrap(~ title)
+```
+
+
+
+
+
 
 
 
